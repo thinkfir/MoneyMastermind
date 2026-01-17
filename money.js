@@ -149,7 +149,7 @@ function mousePressed() {
 }
 
 function draw() {
-  background(12, 16, 28);
+  background(16, 18, 24);
   drawHeader();
   drawLocations();
   drawStocks();
@@ -203,15 +203,15 @@ function drawStocks() {
 }
 
 function drawSelectedPanel() {
-  const panel = { x: width * 0.3, y: height * 0.52, w: width * 0.5, h: height * 0.2 };
-  fill(20, 26, 40);
-  stroke(70, 120, 200);
+  const panel = { x: width * 0.3, y: height * 0.48, w: width * 0.5, h: height * 0.22 };
+  fill(28, 32, 40);
+  stroke(90, 110, 130);
   strokeWeight(2);
   rect(panel.x, panel.y, panel.w, panel.h, 10);
   noStroke();
 
   textAlign(LEFT, TOP);
-  fill(220);
+  fill(228);
   textSize(width * 0.018);
   if (!selectedStock) {
     text("Select a stock card to trade.", panel.x + 20, panel.y + 20);
@@ -225,10 +225,11 @@ function drawSelectedPanel() {
 
   text(`Qty: ${inputQty || "(type or use buttons)"}`, panel.x + 20, panel.y + 80);
 
-  const buyBtn = buttonRect(width * 0.35, height * 0.6, width * 0.12, height * 0.06);
-  const sellBtn = buttonRect(width * 0.53, height * 0.6, width * 0.12, height * 0.06);
-  drawButton(buyBtn, "Buy");
-  drawButton(sellBtn, "Sell");
+  const actionY = panel.y + panel.h - height * 0.1;
+  const buyBtn = buttonRect(width * 0.35, actionY, width * 0.12, height * 0.06);
+  const sellBtn = buttonRect(width * 0.53, actionY, width * 0.12, height * 0.06);
+  drawButton(buyBtn, "Buy", true);
+  drawButton(sellBtn, "Sell", false);
 }
 
 function drawGoal() {
@@ -236,12 +237,12 @@ function drawGoal() {
   const barY = height * 0.78;
   const barW = width * 0.5;
   const barH = height * 0.03;
-  fill(30, 36, 50);
+  fill(38, 42, 48);
   rect(barX, barY, barW, barH, barH / 2);
   const progress = constrain((money - 500) / (goal - 500), 0, 1);
-  fill(90, 200, 110);
+  fill(70, 170, 70);
   rect(barX, barY, barW * progress, barH, barH / 2);
-  fill(230);
+  fill(240);
   textAlign(CENTER, CENTER);
   textSize(width * 0.015);
   text(`Goal: $${money.toFixed(0)} / $${goal}`, barX + barW / 2, barY + barH / 2);
@@ -250,12 +251,12 @@ function drawGoal() {
 function drawButton(rectObj, label, active = false) {
   const { x, y, w, h } = rectObj;
   const hovered = over(rectObj);
-  const base = active ? color(60, 120, 200) : color(40, 52, 70);
-  const hover = active ? color(70, 140, 230) : color(55, 68, 90);
+  const base = active ? color(60, 130, 80) : color(60, 70, 85);
+  const hover = active ? color(70, 150, 95) : color(75, 85, 100);
   fill(hovered ? hover : base);
   noStroke();
   rect(x, y, w, h, h / 2);
-  fill(235);
+  fill(245);
   textAlign(CENTER, CENTER);
   textSize(min(w, h) * 0.35);
   text(label, x + w / 2, y + h / 2);
@@ -264,12 +265,12 @@ function drawButton(rectObj, label, active = false) {
 function drawCard(rectObj, sym, price, qty, active) {
   const { x, y, w, h } = rectObj;
   const hovered = over(rectObj);
-  const base = active ? color(70, 120, 190) : color(32, 40, 60);
-  const hover = active ? color(90, 150, 230) : color(42, 50, 70);
+  const base = active ? color(60, 110, 160) : color(44, 50, 60);
+  const hover = active ? color(70, 130, 180) : color(58, 64, 74);
   fill(hovered ? hover : base);
   noStroke();
   rect(x, y, w, h, 12);
-  fill(235);
+  fill(242);
   textSize(w * 0.16);
   textAlign(CENTER, TOP);
   text(sym, x + w / 2, y + h * 0.12);
