@@ -14,6 +14,18 @@ const locations = [
 ];
 let currentLocation = 0;
 
+// Mafia contraband list and per-location availability
+const contrabandTypes = ["Bliss Dust", "Shadow Bloom", "Viper Venom", "Crimson Haze", "Iron Will Dust", "Ocean Echo"];
+const mafiaLocations = [
+  { name: "Harbor", contraband: ["Bliss Dust", "Viper Venom", "Ocean Echo"], travelCost: 50 },
+  { name: "Midtown", contraband: ["Shadow Bloom", "Viper Venom", "Iron Will Dust"], travelCost: 100 },
+  { name: "Skyline", contraband: ["Crimson Haze", "Shadow Bloom", "Ocean Echo"], travelCost: 200 }
+];
+let mafiaPrices = {};
+let mafiaInventory = {};
+let lastMafiaUpdate = 0;
+const MAFIA_UPDATE_MS = 12000;
+
 // Stock tickers and base prices
 const tickers = [
   { symbol: "AQUA", base: 40 },
@@ -32,6 +44,7 @@ function setup() {
   c.parent("game-root");
   textFont("Courier New");
   initPrices();
+  initMafia();
 }
 
 function windowResized() {
@@ -56,6 +69,8 @@ function advanceDay() {
   });
   // Passive interest (small)
   money += money * 0.01;
+  // Refresh mafia prices on day advance
+  refreshMafiaPrices();
 }
 
 function buy(symbol, qty) {
@@ -79,10 +94,11 @@ function sell(symbol, qty) {
 
 function moveLocation(idx) {
   if (idx === currentLocation) return;
-  const fee = locations[idx].fee;
+  const fee = mafiaLocations[idx].travelCost;
   if (money < fee) return;
   money -= fee;
   currentLocation = idx;
+  refreshMafiaPrices();
 }
 
 function keyPressed() {
@@ -151,10 +167,14 @@ function mousePressed() {
 function draw() {
   background(16, 18, 24);
   drawHeader();
-  drawLocations();
+  drawMafia();
   drawStocks();
   drawSelectedPanel();
   drawGoal();
+  if (millis() - lastMafiaUpdate > MAFIA_UPDATE_MS) {
+    refreshMafiaPrices();
+    lastMafiaUpdate = millis();
+  }
 }
 
 function drawHeader() {
@@ -166,7 +186,7 @@ function drawHeader() {
   textSize(width * 0.016);
   text(`Day ${day}/${maxDays}`, width * 0.04, height * 0.08);
   text(`Cash: $${money.toFixed(0)}`, width * 0.04, height * 0.11);
-  text(`Location: ${locations[currentLocation].name}`, width * 0.04, height * 0.14);
+  text(`Location: ${mafiaLocations[currentLocation].name}`, width * 0.04, height * 0.14);
 
   const btnAdvance = buttonRect(width * 0.8, height * 0.08, width * 0.15, height * 0.06);
   drawButton(btnAdvance, "Next Day");
@@ -175,19 +195,19 @@ function drawHeader() {
 function drawLocations() {
   textSize(width * 0.018);
   textAlign(LEFT, CENTER);
-  for (let i = 0; i < locations.length; i++) {
+  for (let i = 0; i < mafiaLocations.length; i++) {
     const r = buttonRect(width * 0.08, height * 0.2 + i * (height * 0.1), width * 0.18, height * 0.08);
     const active = i === currentLocation;
-    drawButton(r, `${locations[i].name} ($${locations[i].fee})`, active);
+    drawButton(r, `${mafiaLocations[i].name} ($${mafiaLocations[i].travelCost})`, active);
   }
 }
 
 function drawStocks() {
-  const startX = width * 0.3;
-  const startY = height * 0.25;
-  const cardW = width * 0.18;
-  const cardH = height * 0.2;
-  const gap = width * 0.025;
+  const startX = width * 0.32;
+  const startY = height * 0.52;
+  const cardW = width * 0.16;
+  const cardH = height * 0.18;
+  const gap = width * 0.02;
 
   textAlign(CENTER, CENTER);
   for (let i = 0; i < tickers.length; i++) {
@@ -203,8 +223,8 @@ function drawStocks() {
 }
 
 function drawSelectedPanel() {
-  const panel = { x: width * 0.3, y: height * 0.48, w: width * 0.5, h: height * 0.22 };
-  fill(28, 32, 40);
+  const panel = { x: width * 0.05, y: height * 0.42, w: width * 0.22, h: height * 0.5 };
+  fill(30, 36, 46);
   stroke(90, 110, 130);
   strokeWeight(2);
   rect(panel.x, panel.y, panel.w, panel.h, 10);
@@ -213,23 +233,31 @@ function drawSelectedPanel() {
   textAlign(LEFT, TOP);
   fill(228);
   textSize(width * 0.018);
-  if (!selectedStock) {
-    text("Select a stock card to trade.", panel.x + 20, panel.y + 20);
-    return;
+  text("Mafia Trades", panel.x + 16, panel.y + 14);
+
+  const tableY = panel.y + height * 0.07;
+  const rowH = height * 0.06;
+  const con = mafiaLocations[currentLocation].contraband;
+  for (let i = 0; i < con.length; i++) {
+    const item = con[i];
+    const y = tableY + i * rowH;
+    fill(240);
+    textSize(width * 0.014);
+    text(item, panel.x + 16, y);
+    text(`$${(mafiaPrices[item] || 0).toFixed(2)}`, panel.x + panel.w * 0.55, y);
+    text(`Owned: ${mafiaInventory[item] || 0}`, panel.x + panel.w * 0.55, y + rowH * 0.45);
+
+    const buyBtn = buttonRect(panel.x + panel.w * 0.05, y + rowH * 0.45, panel.w * 0.32, rowH * 0.35);
+    const sellBtn = buttonRect(panel.x + panel.w * 0.4, y + rowH * 0.45, panel.w * 0.32, rowH * 0.35);
+    if (over(buyBtn)) {
+      handleMafiaTrade(item, 1);
+    }
+    if (over(sellBtn)) {
+      handleMafiaTrade(item, -1);
+    }
+    drawButton(buyBtn, "Buy", true);
+    drawButton(sellBtn, "Sell", false);
   }
-
-  const price = prices[selectedStock].toFixed(2);
-  const qty = owned[selectedStock] || 0;
-  text(`Trading ${selectedStock} — Price $${price}`, panel.x + 20, panel.y + 20);
-  text(`Owned: ${qty}`, panel.x + 20, panel.y + 50);
-
-  text(`Qty: ${inputQty || "(type or use buttons)"}`, panel.x + 20, panel.y + 80);
-
-  const actionY = panel.y + panel.h - height * 0.1;
-  const buyBtn = buttonRect(width * 0.35, actionY, width * 0.12, height * 0.06);
-  const sellBtn = buttonRect(width * 0.53, actionY, width * 0.12, height * 0.06);
-  drawButton(buyBtn, "Buy", true);
-  drawButton(sellBtn, "Sell", false);
 }
 
 function drawGoal() {
@@ -286,4 +314,45 @@ function buttonRect(x, y, w, h) {
 
 function over(r) {
   return mouseX > r.x && mouseX < r.x + r.w && mouseY > r.y && mouseY < r.y + r.h;
+}
+
+// Mafia helpers
+function initMafia() {
+  contrabandTypes.forEach(c => (mafiaInventory[c] = 0));
+  refreshMafiaPrices();
+  lastMafiaUpdate = millis();
+}
+
+function refreshMafiaPrices() {
+  const loc = mafiaLocations[currentLocation];
+  const baseMinMax = {
+    "Bliss Dust": [10, 50],
+    "Shadow Bloom": [1000, 5000],
+    "Viper Venom": [200, 800],
+    "Crimson Haze": [5000, 15000],
+    "Iron Will Dust": [150, 600],
+    "Ocean Echo": [700, 3000]
+  };
+  loc.contraband.forEach(item => {
+    const range = baseMinMax[item];
+    const base = random(range[0], range[1]);
+    const vol = map(loc.travelCost, 50, 200, 0.08, 0.4, true);
+    const delta = base * random(-vol, vol);
+    mafiaPrices[item] = max(5, base + delta);
+  });
+}
+
+function handleMafiaTrade(item, deltaQty) {
+  const price = mafiaPrices[item] || 0;
+  if (deltaQty > 0) {
+    const cost = price * deltaQty;
+    if (money < cost) return;
+    money -= cost;
+    mafiaInventory[item] = (mafiaInventory[item] || 0) + deltaQty; // BUG: no cap
+  } else {
+    const need = abs(deltaQty);
+    if (!mafiaInventory[item] || mafiaInventory[item] < need) return;
+    money += price * need;
+    mafiaInventory[item] -= need;
+  }
 }
