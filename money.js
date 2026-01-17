@@ -1,49 +1,55 @@
-// Money Mastermind Prototype (p5.js)
-// Goal: Grow a small starting fund by trading locations and stocks over a short timeline.
+// Money Mastermind - Compact Prototype (p5.js)
+// Goal: grow money to a target before day limit; includes Stocks, Mafia, Gambling.
 
-let money = 500;
+let money = 1000;
+let goal = 50000; // tweakable later
 let day = 1;
-let maxDays = 30;
-let goal = 20000;
+let dayLimit = 30;
 
-// Locations and their volatility multipliers
-const locations = [
-  { name: "Harbor", fee: 50, risk: 0.6 },
-  { name: "Midtown", fee: 100, risk: 1.0 },
-  { name: "Skyline", fee: 200, risk: 1.4 }
-];
-let currentLocation = 0;
+let currentScreen = 'menu'; // menu | stocks | mafia | gamble
 
-// Mafia contraband list and per-location availability
-const contrabandTypes = ["Bliss Dust", "Shadow Bloom", "Viper Venom", "Crimson Haze", "Iron Will Dust", "Ocean Echo"];
+// Stocks
+let stocks = [];
+let stockPortfolio = {};
+let selectedStock = null;
+let stockQtyInput = "";
+
+// Mafia
 const mafiaLocations = [
-  { name: "Harbor", contraband: ["Bliss Dust", "Viper Venom", "Ocean Echo"], travelCost: 50 },
-  { name: "Midtown", contraband: ["Shadow Bloom", "Viper Venom", "Iron Will Dust"], travelCost: 100 },
-  { name: "Skyline", contraband: ["Crimson Haze", "Shadow Bloom", "Ocean Echo"], travelCost: 200 }
+  { name: "Harbor", travelCost: 50, contraband: ["Bliss Dust", "Viper Venom", "Ocean Echo"] },
+  { name: "Midtown", travelCost: 100, contraband: ["Shadow Bloom", "Viper Venom", "Iron Will Dust"] },
+  { name: "Skyline", travelCost: 200, contraband: ["Crimson Haze", "Shadow Bloom", "Ocean Echo"] }
 ];
+const contrabandRanges = {
+  "Bliss Dust": [10, 50],
+  "Shadow Bloom": [1000, 5000],
+  "Viper Venom": [200, 800],
+  "Crimson Haze": [5000, 15000],
+  "Iron Will Dust": [150, 600],
+  "Ocean Echo": [700, 3000]
+};
+let mafiaLocationIndex = 0;
 let mafiaPrices = {};
 let mafiaInventory = {};
-let lastMafiaUpdate = 0;
-const MAFIA_UPDATE_MS = 12000;
+let mafiaDailyBuys = 0;
+let mafiaDailySells = 0;
+const MAFIA_DAILY_LIMIT = 3;
+const MAFIA_INV_CAP = 20; // will be enforced; can tweak
 
-// Stock tickers and base prices
-const tickers = [
-  { symbol: "AQUA", base: 40 },
-  { symbol: "NOVA", base: 60 },
-  { symbol: "GRIT", base: 25 }
-];
-let prices = {};
-let owned = {};
+// Gambling
+const gambleLocations = ["Boardwalk", "Old Town", "Neon Strip"];
+let gambleLocationIndex = 0;
+const GAMBLE_PLAY_CAP = 5;
+let gamblePlaysToday = 0;
 
-// UI state
-let selectedStock = null;
-let inputQty = "";
+// Buttons tracked each frame for hit-testing
+let buttons = [];
 
 function setup() {
   const c = createCanvas(windowWidth, windowHeight);
-  c.parent("game-root");
-  textFont("Courier New");
-  initPrices();
+  c.parent('game-root');
+  textFont('Courier New');
+  initStocks();
   initMafia();
 }
 
@@ -51,308 +57,397 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
-function initPrices() {
-  prices = {};
-  tickers.forEach(t => {
-    prices[t.symbol] = t.base * random(0.7, 1.3);
-  });
+function initStocks() {
+  stocks = [
+    makeStock('AQUA'),
+    makeStock('NOVA'),
+    makeStock('GRIT'),
+    makeStock('ZEAL')
+  ];
+  stockPortfolio = {};
 }
 
-function advanceDay() {
-  day++;
-  // Adjust prices based on location risk
-  tickers.forEach(t => {
-    const vol = locations[currentLocation].risk;
-    const drift = random(-0.2, 0.25) * vol;
-    let next = max(1, prices[t.symbol] * (1 + drift));
-    prices[t.symbol] = next;
-  });
-  // Passive interest (small)
-  money += money * 0.01;
-  // Refresh mafia prices on day advance
-  refreshMafiaPrices();
+function makeStock(symbol) {
+  const base = random(40, 120);
+  return {
+    symbol,
+    price: base,
+    dividend: base * 0.03,
+    volatility: random(0.08, 0.22),
+    prev: base
+  };
 }
 
-function buy(symbol, qty) {
-  qty = int(qty);
-  if (!qty || qty < 1) return;
-  const cost = prices[symbol] * qty;
-  if (money < cost) return;
-  money -= cost;
-  owned[symbol] = (owned[symbol] || 0) + qty;
-}
-
-function sell(symbol, qty) {
-  qty = int(qty);
-  if (!qty || qty < 1) return;
-  if (!owned[symbol] || owned[symbol] < qty) return;
-  const rev = prices[symbol] * qty;
-  money += rev;
-  owned[symbol] -= qty;
-  if (owned[symbol] <= 0) delete owned[symbol];
-}
-
-function moveLocation(idx) {
-  if (idx === currentLocation) return;
-  const fee = mafiaLocations[idx].travelCost;
-  if (money < fee) return;
-  money -= fee;
-  currentLocation = idx;
-  refreshMafiaPrices();
-}
-
-function keyPressed() {
-  if (!selectedStock) return;
-  if (keyCode === BACKSPACE) {
-    inputQty = inputQty.slice(0, -1);
-  } else if (keyCode === ENTER) {
-    buy(selectedStock, inputQty);
-    inputQty = "";
-  } else if (key >= '0' && key <= '9' && inputQty.length < 4) {
-    inputQty += key;
-  }
-}
-
-function mousePressed() {
-  // Buttons
-  const btnAdvance = buttonRect(width * 0.8, height * 0.08, width * 0.15, height * 0.06);
-  if (over(btnAdvance)) {
-    advanceDay();
-    return;
-  }
-
-  // Location buttons
-  for (let i = 0; i < locations.length; i++) {
-    const r = buttonRect(width * 0.08, height * 0.2 + i * (height * 0.1), width * 0.18, height * 0.08);
-    if (over(r)) {
-      moveLocation(i);
-      return;
-    }
-  }
-
-  // Stock cards
-  const startX = width * 0.3;
-  const startY = height * 0.25;
-  const cardW = width * 0.18;
-  const cardH = height * 0.2;
-  const gap = width * 0.025;
-  for (let i = 0; i < tickers.length; i++) {
-    const x = startX + i * (cardW + gap);
-    const y = startY;
-    const r = { x, y, w: cardW, h: cardH };
-    if (over(r)) {
-      selectedStock = tickers[i].symbol;
-      inputQty = "";
-      return;
-    }
-  }
-
-  // Buy/Sell buttons
-  if (selectedStock) {
-    const buyBtn = buttonRect(width * 0.35, height * 0.6, width * 0.12, height * 0.06);
-    const sellBtn = buttonRect(width * 0.53, height * 0.6, width * 0.12, height * 0.06);
-    if (over(buyBtn)) {
-      buy(selectedStock, inputQty || 1);
-      inputQty = "";
-      return;
-    }
-    if (over(sellBtn)) {
-      sell(selectedStock, inputQty || 1);
-      inputQty = "";
-      return;
-    }
-  }
-}
-
-function draw() {
-  background(16, 18, 24);
-  drawHeader();
-  drawMafia();
-  drawStocks();
-  drawSelectedPanel();
-  drawGoal();
-  if (millis() - lastMafiaUpdate > MAFIA_UPDATE_MS) {
-    refreshMafiaPrices();
-    lastMafiaUpdate = millis();
-  }
-}
-
-function drawHeader() {
-  fill(232, 238, 247);
-  textSize(width * 0.03);
-  textAlign(LEFT, TOP);
-  text("Money Mastermind", width * 0.04, height * 0.04);
-
-  textSize(width * 0.016);
-  text(`Day ${day}/${maxDays}`, width * 0.04, height * 0.08);
-  text(`Cash: $${money.toFixed(0)}`, width * 0.04, height * 0.11);
-  text(`Location: ${mafiaLocations[currentLocation].name}`, width * 0.04, height * 0.14);
-
-  const btnAdvance = buttonRect(width * 0.8, height * 0.08, width * 0.15, height * 0.06);
-  drawButton(btnAdvance, "Next Day");
-}
-
-function drawLocations() {
-  textSize(width * 0.018);
-  textAlign(LEFT, CENTER);
-  for (let i = 0; i < mafiaLocations.length; i++) {
-    const r = buttonRect(width * 0.08, height * 0.2 + i * (height * 0.1), width * 0.18, height * 0.08);
-    const active = i === currentLocation;
-    drawButton(r, `${mafiaLocations[i].name} ($${mafiaLocations[i].travelCost})`, active);
-  }
-}
-
-function drawStocks() {
-  const startX = width * 0.32;
-  const startY = height * 0.52;
-  const cardW = width * 0.16;
-  const cardH = height * 0.18;
-  const gap = width * 0.02;
-
-  textAlign(CENTER, CENTER);
-  for (let i = 0; i < tickers.length; i++) {
-    const x = startX + i * (cardW + gap);
-    const y = startY;
-    const r = { x, y, w: cardW, h: cardH };
-    const sym = tickers[i].symbol;
-    const price = prices[sym];
-    const qty = owned[sym] || 0;
-    const active = sym === selectedStock;
-    drawCard(r, sym, price, qty, active);
-  }
-}
-
-function drawSelectedPanel() {
-  const panel = { x: width * 0.05, y: height * 0.42, w: width * 0.22, h: height * 0.5 };
-  fill(30, 36, 46);
-  stroke(90, 110, 130);
-  strokeWeight(2);
-  rect(panel.x, panel.y, panel.w, panel.h, 10);
-  noStroke();
-
-  textAlign(LEFT, TOP);
-  fill(228);
-  textSize(width * 0.018);
-  text("Mafia Trades", panel.x + 16, panel.y + 14);
-
-  const tableY = panel.y + height * 0.07;
-  const rowH = height * 0.06;
-  const con = mafiaLocations[currentLocation].contraband;
-  for (let i = 0; i < con.length; i++) {
-    const item = con[i];
-    const y = tableY + i * rowH;
-    fill(240);
-    textSize(width * 0.014);
-    text(item, panel.x + 16, y);
-    text(`$${(mafiaPrices[item] || 0).toFixed(2)}`, panel.x + panel.w * 0.55, y);
-    text(`Owned: ${mafiaInventory[item] || 0}`, panel.x + panel.w * 0.55, y + rowH * 0.45);
-
-    const buyBtn = buttonRect(panel.x + panel.w * 0.05, y + rowH * 0.45, panel.w * 0.32, rowH * 0.35);
-    const sellBtn = buttonRect(panel.x + panel.w * 0.4, y + rowH * 0.45, panel.w * 0.32, rowH * 0.35);
-    if (over(buyBtn)) {
-      handleMafiaTrade(item, 1);
-    }
-    if (over(sellBtn)) {
-      handleMafiaTrade(item, -1);
-    }
-    drawButton(buyBtn, "Buy", true);
-    drawButton(sellBtn, "Sell", false);
-  }
-}
-
-function drawGoal() {
-  const barX = width * 0.3;
-  const barY = height * 0.78;
-  const barW = width * 0.5;
-  const barH = height * 0.03;
-  fill(38, 42, 48);
-  rect(barX, barY, barW, barH, barH / 2);
-  const progress = constrain((money - 500) / (goal - 500), 0, 1);
-  fill(70, 170, 70);
-  rect(barX, barY, barW * progress, barH, barH / 2);
-  fill(240);
-  textAlign(CENTER, CENTER);
-  textSize(width * 0.015);
-  text(`Goal: $${money.toFixed(0)} / $${goal}`, barX + barW / 2, barY + barH / 2);
-}
-
-function drawButton(rectObj, label, active = false) {
-  const { x, y, w, h } = rectObj;
-  const hovered = over(rectObj);
-  const base = active ? color(60, 130, 80) : color(60, 70, 85);
-  const hover = active ? color(70, 150, 95) : color(75, 85, 100);
-  fill(hovered ? hover : base);
-  noStroke();
-  rect(x, y, w, h, h / 2);
-  fill(245);
-  textAlign(CENTER, CENTER);
-  textSize(min(w, h) * 0.35);
-  text(label, x + w / 2, y + h / 2);
-}
-
-function drawCard(rectObj, sym, price, qty, active) {
-  const { x, y, w, h } = rectObj;
-  const hovered = over(rectObj);
-  const base = active ? color(60, 110, 160) : color(44, 50, 60);
-  const hover = active ? color(70, 130, 180) : color(58, 64, 74);
-  fill(hovered ? hover : base);
-  noStroke();
-  rect(x, y, w, h, 12);
-  fill(242);
-  textSize(w * 0.16);
-  textAlign(CENTER, TOP);
-  text(sym, x + w / 2, y + h * 0.12);
-  textSize(w * 0.12);
-  text(`$${price.toFixed(2)}`, x + w / 2, y + h * 0.45);
-  textSize(w * 0.1);
-  text(`Owned: ${qty}`, x + w / 2, y + h * 0.72);
-}
-
-function buttonRect(x, y, w, h) {
-  return { x, y, w, h };
-}
-
-function over(r) {
-  return mouseX > r.x && mouseX < r.x + r.w && mouseY > r.y && mouseY < r.y + r.h;
-}
-
-// Mafia helpers
 function initMafia() {
-  contrabandTypes.forEach(c => (mafiaInventory[c] = 0));
+  mafiaInventory = {};
+  Object.keys(contrabandRanges).forEach(k => (mafiaInventory[k] = 0));
   refreshMafiaPrices();
-  lastMafiaUpdate = millis();
+  mafiaDailyBuys = 0;
+  mafiaDailySells = 0;
 }
 
 function refreshMafiaPrices() {
-  const loc = mafiaLocations[currentLocation];
-  const baseMinMax = {
-    "Bliss Dust": [10, 50],
-    "Shadow Bloom": [1000, 5000],
-    "Viper Venom": [200, 800],
-    "Crimson Haze": [5000, 15000],
-    "Iron Will Dust": [150, 600],
-    "Ocean Echo": [700, 3000]
-  };
+  const loc = mafiaLocations[mafiaLocationIndex];
   loc.contraband.forEach(item => {
-    const range = baseMinMax[item];
-    const base = random(range[0], range[1]);
-    const vol = map(loc.travelCost, 50, 200, 0.08, 0.4, true);
+    const [minP, maxP] = contrabandRanges[item];
+    const base = random(minP, maxP);
+    const vol = map(loc.travelCost, 50, 200, 0.1, 0.45, true);
     const delta = base * random(-vol, vol);
     mafiaPrices[item] = max(5, base + delta);
   });
 }
 
-function handleMafiaTrade(item, deltaQty) {
-  const price = mafiaPrices[item] || 0;
-  if (deltaQty > 0) {
-    const cost = price * deltaQty;
+function draw() {
+  background(18, 20, 28);
+  buttons = [];
+  drawHUD();
+  drawNav();
+  if (currentScreen === 'menu') drawMenu();
+  if (currentScreen === 'stocks') drawStocksScreen();
+  if (currentScreen === 'mafia') drawMafiaScreen();
+  if (currentScreen === 'gamble') drawGambleScreen();
+}
+
+function drawHUD() {
+  fill(240);
+  textSize(width * 0.018);
+  textAlign(LEFT, TOP);
+  text(`Money: $${money.toFixed(0)}`, width * 0.03, height * 0.03);
+  text(`Day: ${day}/${dayLimit}`, width * 0.03, height * 0.06);
+  text(`Goal: $${goal.toLocaleString()}`, width * 0.03, height * 0.09);
+}
+
+function drawNav() {
+  const navY = height * 0.02;
+  const labels = [
+    { k: 'menu', label: 'Menu' },
+    { k: 'stocks', label: 'Stocks' },
+    { k: 'mafia', label: 'Mafia' },
+    { k: 'gamble', label: 'Gambling' },
+    { k: 'next', label: 'Next Day' }
+  ];
+  let x = width * 0.3;
+  const w = width * 0.12;
+  const h = height * 0.05;
+  labels.forEach(entry => {
+    const b = { x, y: navY, w, h, label: entry.label, key: entry.k };
+    drawButton(b, currentScreen === entry.k);
+    buttons.push({ ...b, action: entry.k });
+    x += w + width * 0.01;
+  });
+}
+
+function drawMenu() {
+  textAlign(CENTER, CENTER);
+  fill(230);
+  textSize(width * 0.04);
+  text('Money Mastermind', width / 2, height * 0.3);
+  textSize(width * 0.02);
+  text('Build wealth via Stocks, Mafia trades, and Gambling before the day limit.', width / 2, height * 0.36);
+}
+
+function drawStocksScreen() {
+  textAlign(LEFT, TOP);
+  fill(230);
+  textSize(width * 0.026);
+  text('Stock Market', width * 0.06, height * 0.14);
+
+  const cardW = width * 0.18;
+  const cardH = height * 0.22;
+  let x = width * 0.06;
+  const y = height * 0.2;
+
+  stocks.forEach(s => {
+    const b = { x, y, w: cardW, h: cardH, label: s.symbol };
+    const hovered = isMouseOver(b);
+    fill(hovered ? 50 : 36, 46, 64);
+    stroke(80, 100, 140);
+    strokeWeight(2);
+    rect(b.x, b.y, b.w, b.h, 12);
+    noStroke();
+    fill(240);
+    textAlign(CENTER, TOP);
+    textSize(cardW * 0.16);
+    text(s.symbol, b.x + b.w / 2, b.y + b.h * 0.08);
+    textSize(cardW * 0.12);
+    text(`$${s.price.toFixed(2)}`, b.x + b.w / 2, b.y + b.h * 0.35);
+    textSize(cardW * 0.1);
+    text(`Div: $${s.dividend.toFixed(2)}`, b.x + b.w / 2, b.y + b.h * 0.55);
+    text(`Owned: ${stockPortfolio[s.symbol]?.qty || 0}`, b.x + b.w / 2, b.y + b.h * 0.75);
+    buttons.push({ ...b, action: 'selectStock', symbol: s.symbol });
+    x += cardW + width * 0.02;
+  });
+
+  const panel = { x: width * 0.6, y: height * 0.2, w: width * 0.32, h: height * 0.22 };
+  fill(32, 36, 46);
+  stroke(90, 110, 140);
+  rect(panel.x, panel.y, panel.w, panel.h, 10);
+  noStroke();
+  fill(235);
+  textAlign(LEFT, TOP);
+  textSize(width * 0.018);
+  text('Trade', panel.x + 16, panel.y + 12);
+  text(`Selected: ${selectedStock || '-'}`, panel.x + 16, panel.y + 40);
+  text(`Qty: ${stockQtyInput || '(type numbers)'}`, panel.x + 16, panel.y + 68);
+
+  const buyBtn = { x: panel.x + 16, y: panel.y + panel.h - 60, w: panel.w * 0.4, h: 40, label: 'Buy' };
+  const sellBtn = { x: panel.x + panel.w * 0.55, y: panel.y + panel.h - 60, w: panel.w * 0.4, h: 40, label: 'Sell' };
+  drawButton(buyBtn, true);
+  drawButton(sellBtn, false);
+  buttons.push({ ...buyBtn, action: 'buyStock' });
+  buttons.push({ ...sellBtn, action: 'sellStock' });
+}
+
+function drawMafiaScreen() {
+  textAlign(LEFT, TOP);
+  fill(230);
+  textSize(width * 0.026);
+  text('Mafia Contraband', width * 0.06, height * 0.14);
+  textSize(width * 0.018);
+  text(`Daily Buys: ${mafiaDailyBuys}/${MAFIA_DAILY_LIMIT}  Sells: ${mafiaDailySells}/${MAFIA_DAILY_LIMIT}`, width * 0.06, height * 0.18);
+
+  const tableX = width * 0.06;
+  const tableY = height * 0.22;
+  const rowH = height * 0.08;
+  const con = mafiaLocations[mafiaLocationIndex].contraband;
+  for (let i = 0; i < con.length; i++) {
+    const y = tableY + i * rowH;
+    const item = con[i];
+    fill(38, 44, 56);
+    rect(tableX, y, width * 0.48, rowH - 6, 8);
+    fill(235);
+    textSize(width * 0.017);
+    text(item, tableX + 12, y + 8);
+    text(`$${(mafiaPrices[item] || 0).toFixed(2)}`, tableX + width * 0.2, y + 8);
+    text(`Owned: ${mafiaInventory[item] || 0}`, tableX + width * 0.32, y + 8);
+
+    const buyBtn = { x: tableX + width * 0.26, y: y + rowH * 0.45, w: width * 0.1, h: rowH * 0.4, label: 'Buy' };
+    const sellBtn = { x: tableX + width * 0.38, y: y + rowH * 0.45, w: width * 0.1, h: rowH * 0.4, label: 'Sell' };
+    drawButton(buyBtn, true);
+    drawButton(sellBtn, false);
+    buttons.push({ ...buyBtn, action: 'buyContraband', item });
+    buttons.push({ ...sellBtn, action: 'sellContraband', item });
+  }
+
+  // Travel buttons
+  const travelY = height * 0.5;
+  mafiaLocations.forEach((loc, idx) => {
+    const b = { x: width * 0.06 + idx * width * 0.16, y: travelY, w: width * 0.14, h: height * 0.07, label: `${loc.name} ($${loc.travelCost})` };
+    drawButton(b, idx === mafiaLocationIndex);
+    buttons.push({ ...b, action: 'travelMafia', idx });
+  });
+}
+
+function drawGambleScreen() {
+  textAlign(LEFT, TOP);
+  fill(230);
+  textSize(width * 0.026);
+  text('Gambling Sector', width * 0.06, height * 0.14);
+  textSize(width * 0.018);
+  text(`Plays today: ${gamblePlaysToday}/${GAMBLE_PLAY_CAP}`, width * 0.06, height * 0.18);
+
+  // Location buttons
+  let gx = width * 0.06;
+  gambleLocations.forEach((loc, idx) => {
+    const b = { x: gx, y: height * 0.22, w: width * 0.16, h: height * 0.07, label: loc };
+    drawButton(b, idx === gambleLocationIndex);
+    buttons.push({ ...b, action: 'gambleTravel', idx });
+    gx += width * 0.18;
+  });
+
+  // Games
+  const lotBtn = { x: width * 0.06, y: height * 0.35, w: width * 0.18, h: height * 0.09, label: 'Lottery ($50)' };
+  const diceBtn = { x: width * 0.27, y: height * 0.35, w: width * 0.18, h: height * 0.09, label: 'Dice ($100)' };
+  drawButton(lotBtn, false);
+  drawButton(diceBtn, false);
+  buttons.push({ ...lotBtn, action: 'lottery' });
+  buttons.push({ ...diceBtn, action: 'dice' });
+}
+
+function mousePressed() {
+  for (const b of buttons) {
+    if (isMouseOver(b)) {
+      handleAction(b);
+      return;
+    }
+  }
+}
+
+function keyPressed() {
+  if (currentScreen !== 'stocks') return;
+  if (keyCode === BACKSPACE) {
+    stockQtyInput = stockQtyInput.slice(0, -1);
+  } else if (key >= '0' && key <= '9' && stockQtyInput.length < 5) {
+    stockQtyInput += key;
+  }
+}
+
+function handleAction(b) {
+  if (b.action === 'menu' || b.action === 'stocks' || b.action === 'mafia' || b.action === 'gamble') {
+    currentScreen = b.action;
+    return;
+  }
+  if (b.action === 'next') {
+    nextDay();
+    return;
+  }
+  if (b.action === 'selectStock') {
+    selectedStock = b.symbol;
+    return;
+  }
+  if (b.action === 'buyStock') {
+    tradeStock(true);
+    return;
+  }
+  if (b.action === 'sellStock') {
+    tradeStock(false);
+    return;
+  }
+  if (b.action === 'buyContraband') {
+    tradeContraband(b.item, 1);
+    return;
+  }
+  if (b.action === 'sellContraband') {
+    tradeContraband(b.item, -1);
+    return;
+  }
+  if (b.action === 'travelMafia') {
+    travelMafia(b.idx);
+    return;
+  }
+  if (b.action === 'gambleTravel') {
+    gambleLocationIndex = b.idx;
+    return;
+  }
+  if (b.action === 'lottery') {
+    playLottery();
+    return;
+  }
+  if (b.action === 'dice') {
+    playDice();
+    return;
+  }
+}
+
+function tradeStock(isBuy) {
+  if (!selectedStock) return;
+  const qty = int(stockQtyInput || '1');
+  if (qty <= 0) return;
+  const s = stocks.find(st => st.symbol === selectedStock);
+  if (!s) return;
+  if (isBuy) {
+    const cost = s.price * qty;
     if (money < cost) return;
     money -= cost;
-    mafiaInventory[item] = (mafiaInventory[item] || 0) + deltaQty; // BUG: no cap
+    if (!stockPortfolio[s.symbol]) stockPortfolio[s.symbol] = { qty: 0, avg: 0 };
+    const prevCost = stockPortfolio[s.symbol].qty * stockPortfolio[s.symbol].avg;
+    stockPortfolio[s.symbol].qty += qty;
+    stockPortfolio[s.symbol].avg = (prevCost + cost) / stockPortfolio[s.symbol].qty;
   } else {
-    const need = abs(deltaQty);
-    if (!mafiaInventory[item] || mafiaInventory[item] < need) return;
-    money += price * need;
-    mafiaInventory[item] -= need;
+    if (!stockPortfolio[s.symbol] || stockPortfolio[s.symbol].qty < qty) return;
+    money += s.price * qty;
+    stockPortfolio[s.symbol].qty -= qty;
+    if (stockPortfolio[s.symbol].qty <= 0) delete stockPortfolio[s.symbol];
   }
+  stockQtyInput = "";
+}
+
+function tradeContraband(item, delta) {
+  if (delta > 0 && mafiaDailyBuys >= MAFIA_DAILY_LIMIT) return;
+  if (delta < 0 && mafiaDailySells >= MAFIA_DAILY_LIMIT) return;
+  const price = mafiaPrices[item] || 0;
+  if (delta > 0) {
+    if (money < price * delta) return;
+    if (mafiaInventory[item] + delta > MAFIA_INV_CAP) return;
+    money -= price * delta;
+    mafiaInventory[item] += delta;
+    mafiaDailyBuys++;
+  } else {
+    const need = abs(delta);
+    if (!mafiaInventory[item] || mafiaInventory[item] < need) return;
+    mafiaInventory[item] -= need;
+    money += price * need;
+    mafiaDailySells++;
+  }
+}
+
+function travelMafia(idx) {
+  if (idx === mafiaLocationIndex) return;
+  const cost = mafiaLocations[idx].travelCost;
+  if (money < cost) return;
+  money -= cost;
+  mafiaLocationIndex = idx;
+  refreshMafiaPrices();
+}
+
+function nextDay() {
+  day++;
+  // stocks update and dividends
+  stocks.forEach(s => {
+    s.prev = s.price;
+    const drift = random(-s.volatility, s.volatility);
+    s.price = max(1, s.price * (1 + drift));
+  });
+  let divs = 0;
+  Object.keys(stockPortfolio).forEach(sym => {
+    const s = stocks.find(x => x.symbol === sym);
+    if (s) divs += stockPortfolio[sym].qty * s.dividend;
+  });
+  money += divs;
+
+  // mafia price refresh and reset limits
+  refreshMafiaPrices();
+  mafiaDailyBuys = 0;
+  mafiaDailySells = 0;
+
+  // gambling daily reset
+  gamblePlaysToday = 0;
+
+  // Check day limit
+  if (day > dayLimit) {
+    // freeze input; minimal handling
+    currentScreen = 'menu';
+  }
+}
+
+function playLottery() {
+  if (gamblePlaysToday >= GAMBLE_PLAY_CAP) return;
+  const cost = 50;
+  if (money < cost) return;
+  money -= cost;
+  gamblePlaysToday++;
+  const roll = random();
+  if (roll < 0.01) {
+    money += cost * 25; // jackpot
+  } else if (roll < 0.12) {
+    money += cost * 4; // win
+  }
+}
+
+function playDice() {
+  if (gamblePlaysToday >= GAMBLE_PLAY_CAP) return;
+  const cost = 100;
+  if (money < cost) return;
+  money -= cost;
+  gamblePlaysToday++;
+  if (random() < 0.48) {
+    money += cost * 1.8;
+  }
+}
+
+function drawButton(b, active) {
+  const hovered = isMouseOver(b);
+  const base = active ? color(60, 130, 80) : color(60, 70, 85);
+  const hover = active ? color(70, 150, 95) : color(75, 85, 100);
+  fill(hovered ? hover : base);
+  noStroke();
+  rect(b.x, b.y, b.w, b.h, b.h / 3);
+  fill(245);
+  textAlign(CENTER, CENTER);
+  textSize(min(b.w, b.h) * 0.35);
+  text(b.label, b.x + b.w / 2, b.y + b.h / 2);
+}
+
+function isMouseOver(r) {
+  return mouseX > r.x && mouseX < r.x + r.w && mouseY > r.y && mouseY < r.y + r.h;
 }
