@@ -386,10 +386,8 @@ function draw() {
         drawBuySellStockScreen(selectedStockSymbol); // Show buy/sell interface for selected stock
     } else if (currentGameState === 'winScreen') {
         drawWinScreen(); // Show victory screen
-        noLoop(); // Stop the game loop so players can click "Play Again"
     } else if (currentGameState === 'loseScreen') {
         drawLoseScreen(); // Show defeat screen
-        noLoop(); // Stop the game loop so players can click "Play Again"
     }
 
     // Always draw game info (money, day, goal) and messages on top, UNLESS on win/lose screen
@@ -3142,16 +3140,14 @@ function advanceDay() {
     if (gameMoney >= MONEY_GOAL) {
         addGameMessage(`Congratulations! You reached $${MONEY_GOAL.toLocaleString()} in ${gameDay} days! You win!`, 'success');
         setGameState('winScreen'); // Show win screen
-        // NOTE: Don't call noLoop() here - let draw() render the win screen first
-        // We'll call noLoop() at the start of draw() when state is already set
+        noLoop(); // Stop the game from running (freeze everything)
     } 
     // STEP 5: Check if player lost
     // Lose condition: day 100 arrives before reaching $500,000
     else if (gameDay >= DAY_LIMIT) {
         addGameMessage(`Time's up! You did not reach $${MONEY_GOAL.toLocaleString()} within ${DAY_LIMIT} days. Game Over!`, 'error');
         setGameState('loseScreen'); // Show lose screen
-        // NOTE: Don't call noLoop() here - let draw() render the lose screen first
-        // We'll call noLoop() at the start of draw() when state is already set
+        noLoop(); // Stop the game from running (freeze everything)
     }
 }
 
