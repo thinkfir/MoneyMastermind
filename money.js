@@ -91,9 +91,10 @@ let mafiaDailySells = 0;
 
 // --- Lottery Variables ---
 const lotteryLocations = [
-    { name: 'Boardwalk', minBet: 10, maxBet: 500, odds: 0.15 },
-    { name: 'OldTown', minBet: 20, maxBet: 1000, odds: 0.20 },
-    { name: 'Neon Strip', minBet: 50, maxBet: 2000, odds: 0.25 }
+    // Higher travel cost -> higher chance to win and higher payouts
+    { name: 'Boardwalk', minBet: 50, maxBet: 5000, odds: 0.30, travelCost: 0 },
+    { name: 'OldTown', minBet: 100, maxBet: 10000, odds: 0.40, travelCost: 500 },
+    { name: 'Neon Strip', minBet: 200, maxBet: 20000, odds: 0.50, travelCost: 2000 }
 ];
 let currentLotteryLocationIndex = 0; // Default to Boardwalk
 let lotteryBetAmount = "";
@@ -481,10 +482,22 @@ function mousePressed() {
             return;
         }
 
-        // Location selection buttons
+        // Location selection buttons (charge travel cost when changing locations)
         for (let btn of btnLotteryLocation) {
             if (isMouseOver(btn)) {
                 animateButtonClick(btn);
+                if (btn.index !== currentLotteryLocationIndex) {
+                    const newLoc = lotteryLocations[btn.index];
+                    const cost = newLoc.travelCost || 0;
+                    if (cost > 0) {
+                        if (gameMoney < cost) {
+                            addGameMessage(`Not enough money to travel. Need $${cost.toLocaleString()}.`, 'warning');
+                            return;
+                        }
+                        gameMoney -= cost;
+                        addGameMessage(`Traveled to ${newLoc.name} for $${cost.toLocaleString()}.`, 'info');
+                    }
+                }
                 currentLotteryLocationIndex = btn.index;
                 return;
             }
@@ -1131,8 +1144,8 @@ function generateMafiaPrices(locationName) {
     const locationObj = mafiaLocations.find(loc => loc.name === locationName);
     const contrabandForLocation = locationObj ? locationObj.contraband : [];
 
-    const minMafiaVolatility = 0.05; // Base for lowest volatility city (Denver)
-    const maxMafiaVolatility = 0.5; // Base for highest volatility city (New York)
+    const minMafiaVolatility = 0.15; // Increased base volatility
+    const maxMafiaVolatility = 0.60; // Increased max volatility
 
     // Calculate effective volatility based on location's travel cost
     const travelCost = locationObj.travelCost;
@@ -1146,16 +1159,16 @@ function generateMafiaPrices(locationName) {
 
     contrabandForLocation.forEach(item => { // Only generate prices for contraband in this location
         let basePrice;
-        // Base price ranges for different contraband types
+        // Increased base price ranges for different contraband types (to fit $500k goal)
         switch (item) {
-            case 'Bliss Dust': basePrice = random(10, 50); break;
-            case 'Shadow Bloom': basePrice = random(1000, 5000); break;
-            case 'Viper Venom': basePrice = random(200, 800); break;
-            case 'Crimson Haze': basePrice = random(5000, 15000); break; // Higher base for high-value contraband
-            case 'Starlight Shard': basePrice = random(500, 2000); break;
-            case 'Iron Will Dust': basePrice = random(150, 600); break;
-            case 'Ocean Echo': basePrice = random(700, 3000); break;
-            default: basePrice = random(50, 200);
+            case 'Bliss Dust': basePrice = random(50, 200); break;
+            case 'Shadow Bloom': basePrice = random(3000, 10000); break;
+            case 'Viper Venom': basePrice = random(500, 2000); break;
+            case 'Crimson Haze': basePrice = random(10000, 30000); break;
+            case 'Starlight Shard': basePrice = random(1500, 5000); break;
+            case 'Iron Will Dust': basePrice = random(400, 1500); break;
+            case 'Ocean Echo': basePrice = random(2000, 8000); break;
+            default: basePrice = random(100, 500);
         }
 
         // Price change based on base price and effective volatility
@@ -1164,11 +1177,11 @@ function generateMafiaPrices(locationName) {
         // Let's refine the fluctuation magnitude formula.
         // For a 15000 base, 10000 fluctuation is ~66%. If effectiveVolatility max is 0.5, we need basePrice * 0.5 * X = 10000 => X = 1.33
         // So, let's make the random range for fluctuation wider, especially for high volatility areas.
-        let fluctuationFactor = map(effectiveVolatility, minMafiaVolatility, maxMafiaVolatility, 0.5, 2.0); // Less volatile cities have smaller random swings
+        let fluctuationFactor = map(effectiveVolatility, minMafiaVolatility, maxMafiaVolatility, 0.7, 2.5); // Wider swings for high-cost cities
         let priceChange = basePrice * random(-effectiveVolatility * fluctuationFactor, effectiveVolatility * fluctuationFactor);
 
         let finalPrice = parseFloat((basePrice + priceChange).toFixed(2));
-        prices[item] = Math.max(5, finalPrice); // Ensure price doesn't go too low
+        prices[item] = Math.max(10, finalPrice); // Ensure price doesn't go too low
     });
     addGameMessage(`Contraband prices updated in ${locationName}.`, 'info');
     return prices;
@@ -1597,21 +1610,24 @@ function playLottery(betAmount) {
     const won = random(100) < (winChance * 100);
 
     if (won) {
-        const winnings = betAmount * 2; // Win double the bet
+        // Payout multipliers scale with travel cost: Boardwalk 3x, OldTown 4x, Neon Strip 5x
+        const multipliers = [3, 4, 5];
+        const multiplier = multipliers[currentLotteryLocationIndex];
+        const winnings = betAmount * multiplier;
         gameMoney += winnings;
         lotteryLastResult = {
             won: true,
             amount: winnings,
-            message: `🎉 You won $${winnings}!`
+            message: `🎉 You won $${winnings.toLocaleString()}! (${multiplier}x)`
         };
-        addGameMessage(`Won $${winnings} at the lottery!`, 'success');
+        addGameMessage(`Won $${winnings.toLocaleString()} at the lottery! (${multiplier}x)`, 'success');
     } else {
         lotteryLastResult = {
             won: false,
             amount: betAmount,
-            message: `😞 You lost $${betAmount}...`
+            message: `😞 You lost $${betAmount.toLocaleString()}...`
         };
-        addGameMessage(`Lost $${betAmount}...`, 'warning');
+        addGameMessage(`Lost $${betAmount.toLocaleString()}...`, 'warning');
     }
 
     lotteryLastResultTime = millis();
@@ -1651,8 +1667,15 @@ function drawLotteryScreen() {
     textSize(width * 0.02);
     text(`Min Bet: $${currentLocation.minBet} | Max Bet: $${currentLocation.maxBet} | Odds: ${(currentLocation.odds * 100).toFixed(0)}%`, width / 2, height * 0.20);
 
-    // Draw location buttons
+    // Draw location buttons (show move cost on other locations)
     for (let btn of btnLotteryLocation) {
+        const loc = lotteryLocations[btn.index];
+        if (btn.index === currentLotteryLocationIndex) {
+            btn.text = `${loc.name} (Here)`;
+        } else {
+            const moveCost = loc.travelCost || 0;
+            btn.text = `${loc.name} - $${moveCost.toLocaleString()}`;
+        }
         btn.color = currentLotteryLocationIndex === btn.index ? color(255, 200, 100) : color(180, 120, 50);
         drawButton(btn, 'lottery');
     }
@@ -1706,20 +1729,20 @@ function drawLotteryScreen() {
 function initializeStocks() {
     for (const region of regions) {
         for (const symbol of region.stocks) {
-            // Initial price generation
-            const initialPrice = parseFloat((random(50, 200)).toFixed(2));
-            // Dividend is now a fixed 5% of initial price
-            const dividendValue = parseFloat((initialPrice * 0.05).toFixed(2)); // Changed to 5%
+            // Initial price generation (higher range to fit $500k goal)
+            const initialPrice = parseFloat((random(100, 500)).toFixed(2));
+            // Dividend is now 8% of initial price for better passive income
+            const dividendValue = parseFloat((initialPrice * 0.08).toFixed(2));
 
-            // Uniform, lower volatility for all stock market regions
-            const volatility = random(0.08, 0.25); // Original volatility range for stocks
+            // Increased volatility for more dramatic moves
+            const volatility = random(0.12, 0.35);
 
             stocksData[symbol] = {
                 price: initialPrice,
                 prevPrice: 0, // Will be updated on first day advance
-                volatility: volatility, // Using uniform volatility
+                volatility: volatility,
                 history: [], // To store price history if needed later
-                dividend: dividendValue // Added fixed daily dividend
+                dividend: dividendValue
             };
         }
     }
@@ -2599,7 +2622,8 @@ function advanceDay() {
     if (currentGameState === 'stockMarket') {
         advanceStockPrices(); // Update stock prices when day advances if in stock market
     }
-    // Mafia Wars price update is now time-based, not day-based.
+    // Also refresh Mafia Wars prices daily regardless of current screen
+    mafiaContrabandPrices = generateMafiaPrices(mafiaLocations[currentMafiaLocationIndex].name);
 
     addGameMessage(`Advanced to Day ${gameDay}.`);
 
