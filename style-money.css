@@ -1,6 +1,7 @@
-/* Import Google Font - Inter for a clean look */
+/* Font stack for neon-sci-fi vibe */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700;900&display=swap');
 
+/* Global reset + fullscreen viewport base */
 html, body {
     margin: 0;
     padding: 0;
@@ -14,7 +15,7 @@ html, body {
     position: relative;
 }
 
-/* Animated background */
+/* Animated background glows layered behind the canvas */
 body::before {
     content: '';
     position: fixed;
@@ -36,7 +37,7 @@ body {
     align-items: center;
 }
 
-/* Game container - futuristic styling */
+/* Canvas host that the game uses as its root */
 #game-container {
     position: relative;
     width: 100%;
@@ -49,7 +50,7 @@ body {
     border: 1px solid rgba(0, 255, 136, 0.2);
 }
 
-/* Cyber grid overlay */
+/* Subtle cyber grid overlay sits above gradients */
 #game-container::before {
     content: '';
     position: absolute;
