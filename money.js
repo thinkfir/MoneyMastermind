@@ -924,6 +924,11 @@ function setupMainMenuButtons() {
 }
 
 function drawMainMenu() {
+    // --- ANIMATED BACKGROUND FOR MAIN MENU ---
+    drawAnimatedBackground(color(8, 15, 30), color(15, 25, 45));
+    drawAnimatedGridOverlay([100, 200, 150]);
+    drawWaveOverlay([0, 255, 120], 20);
+    
     // Retro grid overlay
     fill(0, 255, 120, 30);
     for (let x = 0; x < width; x += 40) {
@@ -1499,13 +1504,13 @@ function initializeLottery() {
 }
 
 function setupLotteryButtons() {
-    // Location selection buttons
+    // Location selection buttons - positioned far left, above back button, below HUD
     btnLotteryLocation = [];
-    const locBtnWidth = width * 0.3;
-    const locBtnHeight = height * 0.1;
-    const locBtnStartX = width / 2 - locBtnWidth / 2;
-    const locBtnStartY = height * 0.25;
-    const locBtnGap = height * 0.05;
+    const locBtnWidth = width * 0.22;
+    const locBtnHeight = height * 0.08;
+    const locBtnStartX = width * 0.02;
+    const locBtnStartY = height * 0.55; // Above back button at 0.92
+    const locBtnGap = height * 0.02;
 
     lotteryLocations.forEach((location, index) => {
         btnLotteryLocation.push({
@@ -1519,10 +1524,10 @@ function setupLotteryButtons() {
         });
     });
 
-    // Bet placement button
+    // Bet placement button - moved up
     btnLotteryBet = {
         x: width * 0.35,
-        y: height * 0.65,
+        y: height * 0.58,
         width: width * 0.3,
         height: height * 0.08,
         text: 'Place Bet',
@@ -1637,7 +1642,7 @@ function drawLotteryScreen() {
     textFont('Courier New');
     textSize(width * 0.022);
     textAlign(CENTER, TOP);
-    text("Enter Bet Amount:", width / 2, height * 0.53);
+    text("Enter Bet Amount:", width / 2, height * 0.68);
 
     // Bet input box
     fill(30, 30, 60);
@@ -1645,14 +1650,14 @@ function drawLotteryScreen() {
     strokeWeight(2);
     const inputBoxWidth = width * 0.2;
     const inputBoxHeight = height * 0.06;
-    rect(width / 2 - inputBoxWidth / 2, height * 0.58, inputBoxWidth, inputBoxHeight);
+    rect(width / 2 - inputBoxWidth / 2, height * 0.73, inputBoxWidth, inputBoxHeight);
 
     // Display bet amount input
     fill(0, 255, 150);
     textFont('Courier New');
     textSize(width * 0.025);
     textAlign(CENTER, CENTER);
-    text(lotteryBetAmount, width / 2, height * 0.58 + inputBoxHeight / 2);
+    text(lotteryBetAmount, width / 2, height * 0.73 + inputBoxHeight / 2);
 
     noStroke();
 
@@ -1665,7 +1670,7 @@ function drawLotteryScreen() {
         textFont('Courier New');
         textSize(width * 0.035);
         textAlign(CENTER, CENTER);
-        text(lotteryLastResult.message, width / 2, height * 0.80);
+        text(lotteryLastResult.message, width / 2, height * 0.87);
     }
 
     // Draw back button
@@ -2376,8 +2381,8 @@ function drawGameInfo() {
 
     fill(255);
     textAlign(CENTER, CENTER);
-    textSize(textBaseSize * 0.7);
-    text(`${((gameMoney / MONEY_GOAL) * 100).toFixed(0)}%`, boxX + barPaddingX + barWidth / 2, barY + barHeight / 2);
+    textSize(textBaseSize * 0.65);
+    text(`$${gameMoney.toLocaleString()}/$${MONEY_GOAL.toLocaleString()}`, boxX + barPaddingX + barWidth / 2, barY + barHeight / 2);
 
     currentTextY += barHeight + lineSpacing * 1.2;
 
@@ -2385,7 +2390,7 @@ function drawGameInfo() {
     textSize(textBaseSize * 0.85);
     textAlign(LEFT, BOTTOM);
     fill(255, 200, 100);
-    text('TIME:', boxX + barPaddingX, currentTextY + 3);
+    text('DAYS:', boxX + barPaddingX, currentTextY + 3);
 
     // Bar background with glow
     fill(15, 20, 30);
