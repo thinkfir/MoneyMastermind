@@ -202,7 +202,7 @@ function drawButton(btn) {
   rect(btn.x, btn.y, btn.width, btn.height, radius);
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(min(btn.height * 0.45, width * 0.022));
+  textSize(min(btn.height * 0.45, height * 0.03));
   text(btn.text || '', btn.x + btn.width / 2, btn.y + btn.height / 2);
 }
 
@@ -547,30 +547,52 @@ function drawLocationButtons() {
 
 // --- Gambling
 function drawGamblingScreen() {
-  background(14, 12, 30);
-  fill(240, 245, 250);
-  textSize(width * 0.032);
+  background(10, 10, 20);
+  drawScanlines();
+  fill(240, 255, 240);
   textAlign(CENTER, TOP);
-  text("GAMBLING HALL", width / 2, height * 0.08);
+  textSize(width * 0.03);
+  text("GAMBLING HALL", width / 2, height * 0.06);
   textSize(width * 0.02);
-  text(`Plays today: ${gamblePlaysToday}/${GAMBLE_PLAY_CAP}`, width / 2, height * 0.13);
+  text(`Plays today: ${gamblePlaysToday}/${GAMBLE_PLAY_CAP}`, width / 2, height * 0.11);
 
-  // Locations
-  const locW = width * 0.18;
+  // HUD buttons
+  drawButton(btnNextDayGlobal);
+  drawButton(btnBackToMain);
+
+  // Panel frames to match stock/mafia look
+  const panelW = width * 0.78;
+  const panelH = height * 0.65;
+  const panelX = width / 2 - panelW / 2;
+  const panelY = height * 0.18;
+  fill(20, 30, 45, 200);
+  stroke(100, 255, 200, 80);
+  strokeWeight(2);
+  rect(panelX, panelY, panelW, panelH, 12);
+  noStroke();
+
+  // Locations strip
+  const locW = width * 0.16;
   const locH = height * 0.08;
-  const gap = width * 0.02;
+  const gap = width * 0.018;
   const totalW = gambleLocations.length * locW + (gambleLocations.length - 1) * gap;
   let startX = width / 2 - totalW / 2;
-  const y = height * 0.2;
+  const locY = panelY + height * 0.04;
+  textAlign(CENTER, CENTER);
+  textSize(locH * 0.35);
   for (let i = 0; i < gambleLocations.length; i++) {
-    const b = { x: startX + i * (locW + gap), y, width: locW, height: locH, text: gambleLocations[i], color: i === gambleLocationIndex ? color(80, 180, 80) : color(80, 100, 140) };
+    const b = { x: startX + i * (locW + gap), y: locY, width: locW, height: locH, text: gambleLocations[i], color: i === gambleLocationIndex ? color(60, 150, 90) : color(60, 80, 120) };
     drawButton(b);
   }
 
-  // Games
-  const lotBtn = { x: width * 0.25, y: height * 0.4, width: width * 0.22, height: height * 0.12, text: 'Lottery ($50)', color: color(245, 158, 11) };
-  const diceBtn = { x: width * 0.53, y: height * 0.4, width: width * 0.22, height: height * 0.12, text: 'Dice ($100)', color: color(90, 130, 220) };
-  drawButton(lotBtn); drawButton(diceBtn);
+  // Games panel
+  const gamePanelY = locY + locH + height * 0.05;
+  const gameBtnW = width * 0.25;
+  const gameBtnH = height * 0.12;
+  const lotBtn = { x: width * 0.26, y: gamePanelY, width: gameBtnW, height: gameBtnH, text: 'Lottery ($50)', color: color(245, 158, 11) };
+  const diceBtn = { x: width * 0.52, y: gamePanelY, width: gameBtnW, height: gameBtnH, text: 'Dice ($100)', color: color(90, 130, 220) };
+  drawButton(lotBtn);
+  drawButton(diceBtn);
 }
 
 // --- Wallet
@@ -689,6 +711,8 @@ function mousePressed() {
     const btnBack = { x: width / 2 - (width * 0.2) / 2, y: height * 0.9, width: width * 0.2, height: height * 0.07 };
     if (isMouseOver(btnBack)) { setGameState('mainMenu'); return; }
   } else if (currentState === 'gambling') {
+    if (isMouseOver(btnNextDayGlobal)) { advanceDay(); return; }
+    if (isMouseOver(btnBackToMain)) { setGameState('mainMenu'); return; }
     const lotBtn = { x: width * 0.25, y: height * 0.4, width: width * 0.22, height: height * 0.12 };
     const diceBtn = { x: width * 0.53, y: height * 0.4, width: width * 0.22, height: height * 0.12 };
     if (isMouseOver(lotBtn)) { playLottery(); return; }
@@ -834,3 +858,4 @@ function playDice() {
   if (random() < 0.48) { gameMoney += cost * 1.8; addGameMessage("Dice win!", 'success'); }
   else addGameMessage("Dice loss.", 'warning');
 }
+
