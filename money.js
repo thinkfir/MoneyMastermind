@@ -974,10 +974,30 @@ function drawMainMenu() {
     drawButton(btnNewGame);
 }
     // Generic function to draw a button with enhanced styling
-function drawButton(button) {
+function drawButton(button, themeOverride = null) {
     // --- ENHANCED FUTURISTIC BUTTON WITH ANIMATIONS ---
     let btnColor = color(0, 255, 120); // Neon green default
     if (button.color) btnColor = button.color;
+    
+    // Apply theme-based styling if specified
+    if (themeOverride) {
+        if (themeOverride === 'lottery') {
+            // Orange/gold theme for lottery
+            if (!button.color || button === btnAdvanceDayGlobal) {
+                btnColor = color(220, 150, 50);
+            }
+        } else if (themeOverride === 'mafia') {
+            // Red/dark theme for mafia
+            if (!button.color || button === btnAdvanceDayGlobal) {
+                btnColor = color(220, 50, 80);
+            }
+        } else if (themeOverride === 'stock') {
+            // Green/cyan theme for stock market
+            if (!button.color || button === btnAdvanceDayGlobal) {
+                btnColor = color(50, 200, 150);
+            }
+        }
+    }
 
     let textColor = color(255, 255, 255); // Bright white text
     let isHovered = isMouseOver(button);
@@ -1323,7 +1343,7 @@ function drawMafiaWarsScreen() {
     drawLocationButtons();
 
     // Draw the global "Next Day" button
-    drawButton(btnAdvanceDayGlobal);
+    drawButton(btnAdvanceDayGlobal, 'mafia');
 
     // Back button to main menu
     const btnBackToMainMafia = {
@@ -1332,9 +1352,9 @@ function drawMafiaWarsScreen() {
         width: width * 0.2,
         height: height * 0.07,
         text: 'Main Menu',
-        color: color(100, 100, 100)
+        color: color(150, 50, 80)
     };
-    drawButton(btnBackToMainMafia);
+    drawButton(btnBackToMainMafia, 'mafia');
 
     // Mafia Prices update by minute (every MAFIA_PRICE_UPDATE_INTERVAL milliseconds)
     if (millis() - lastMafiaPriceUpdateTime > MAFIA_PRICE_UPDATE_INTERVAL) {
@@ -1455,7 +1475,7 @@ function drawLocationButtons() {
     const locBtnWidth = width * 0.13; // Adjusted width for single line, was 0.12
     const locBtnHeight = height * 0.09; // Increased height to accommodate text better
     const locGapX = width * 0.015; // Increased horizontal gap
-    const locStartY = height * 0.82; // Y position for the single line of buttons
+    const locStartY = height * 0.78; // Y position for the single line of buttons - moved up from 0.82
 
     fill(240, 245, 250);
     textSize(width * 0.018);
@@ -1473,7 +1493,7 @@ function drawLocationButtons() {
 
         let locColor = color(80, 80, 150); // Default blueish
         if (i === currentMafiaLocationIndex) { // Check against index
-            locColor = color(50, 180, 50); // Green for current location
+            locColor = color(40, 120, 40); // Darker green for current location - less bright
         }
 
         // Draw the button rectangle itself (behind the text)
@@ -1519,7 +1539,7 @@ function setupLotteryButtons() {
             width: locBtnWidth,
             height: locBtnHeight,
             text: location.name,
-            color: currentLotteryLocationIndex === index ? color(100, 200, 100) : color(100, 100, 200),
+            color: currentLotteryLocationIndex === index ? color(255, 200, 100) : color(180, 120, 50),
             index: index
         });
     });
@@ -1633,8 +1653,8 @@ function drawLotteryScreen() {
 
     // Draw location buttons
     for (let btn of btnLotteryLocation) {
-        btn.color = currentLotteryLocationIndex === btn.index ? color(100, 200, 100) : color(100, 100, 200);
-        drawButton(btn);
+        btn.color = currentLotteryLocationIndex === btn.index ? color(255, 200, 100) : color(180, 120, 50);
+        drawButton(btn, 'lottery');
     }
 
     // Bet input label
@@ -1662,7 +1682,7 @@ function drawLotteryScreen() {
     noStroke();
 
     // Draw bet button
-    drawButton(btnLotteryBet);
+    drawButton(btnLotteryBet, 'lottery');
 
     // Draw result if within display duration
     if (lotteryLastResult && (millis() - lotteryLastResultTime) < LOTTERY_RESULT_DISPLAY_DURATION) {
@@ -1674,10 +1694,10 @@ function drawLotteryScreen() {
     }
 
     // Draw back button
-    drawButton(btnLotteryBackToMain);
+    drawButton(btnLotteryBackToMain, 'lottery');
 
     // Draw the global "Next Day" button
-    drawButton(btnAdvanceDayGlobal);
+    drawButton(btnAdvanceDayGlobal, 'lottery');
 }
 
 
@@ -1869,10 +1889,10 @@ function drawStockMarketScreen() {
     }
 
     // Draw action buttons - using enhanced drawButton function
-    drawButton(btnNextDay);
-    drawButton(btnMoveRegion);
-    drawButton(btnWallet);
-    drawButton(btnBackToMain);
+    drawButton(btnNextDay, 'stock');
+    drawButton(btnMoveRegion, 'stock');
+    drawButton(btnWallet, 'stock');
+    drawButton(btnBackToMain, 'stock');
 }
 
 function drawWalletScreen() {
@@ -1965,7 +1985,7 @@ function drawWalletScreen() {
         rowNumber++;
     }
 
-    drawButton(btnBackToStockMarket); // Reusing the back button style
+    drawButton(btnBackToStockMarket, 'stock'); // Reusing the back button style
 }
 
 function drawIllegalWalletScreen() {
@@ -2095,7 +2115,7 @@ function drawMoveRegionScreen() {
         currentY += buttonHeight + gap;
     }
 
-    drawButton(btnBackToStockMarket);
+    drawButton(btnBackToStockMarket, 'stock');
 }
 
 function drawBuySellStockScreen(symbol) {
@@ -2105,7 +2125,7 @@ function drawBuySellStockScreen(symbol) {
         textAlign(CENTER, CENTER);
         textSize(32);
         text("Error: Stock not found!", width / 2, height / 2);
-        drawButton(btnBackToStockMarket);
+        drawButton(btnBackToStockMarket, 'stock');
         return;
     }
 
@@ -2180,7 +2200,7 @@ function drawBuySellStockScreen(symbol) {
     drawButton(btnMaxSell);
     drawButton(btnMaxBuy);
 
-    drawButton(btnBackToStockMarket);
+    drawButton(btnBackToStockMarket, 'stock');
 }
 
 function buyStock(symbol, quantity) {
