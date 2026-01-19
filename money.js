@@ -342,24 +342,26 @@ function draw() {
 
     // Animated scanlines - horizontal lines that flicker like old TV static
     // Opacity varies based on frameCount so they pulse/flicker
-    stroke(0, 255, 100, 15 + 15 * sin(frameCount * 0.02));
-    for (let y = 0; y < height; y += 4) {
+    stroke(0, 255, 100, 3 + 2 * sin(frameCount * 0.02)); // Reduced opacity: was 15+15, now 3+2
+    for (let y = 0; y < height; y += 8) { // Increased spacing: was 4, now 8
         line(0, y, width, y); // Draw horizontal scanline
     }
     noStroke();
+    strokeWeight(1); // Reset stroke weight to default
 
     // Subtle grid overlay - vertical and horizontal lines for cyber feel
-    stroke(0, 150, 100, 8); // Semi-transparent green lines
+    stroke(0, 150, 100, 2); // Reduced opacity: was 8, now 2
     strokeWeight(0.5); // Very thin lines
     // Vertical lines
-    for (let x = 0; x < width; x += 80) {
+    for (let x = 0; x < width; x += 120) { // Increased spacing: was 80, now 120
         line(x, 0, x, height);
     }
     // Horizontal lines
-    for (let y = 0; y < height; y += 80) {
+    for (let y = 0; y < height; y += 120) { // Increased spacing: was 80, now 120
         line(0, y, width, y);
     }
     noStroke();
+    strokeWeight(1); // Reset stroke weight to default
 
     // Always draw the game title at the top of every screen
     drawCanvasTitle();
