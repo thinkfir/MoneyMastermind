@@ -328,40 +328,33 @@ function setup() {
 // This is the game's main loop that renders everything to the screen
 function draw() {
     // --- FUTURISTIC COSMIC THEME ---
-    // Create a gradient background that goes from dark blue at top to darker blue at bottom
-    for (let y = 0; y < height; y += 2) {
-        // Map y position (0 to height) to a percentage (0 to 1)
+    // Draw solid background first to clear previous frame
+    background(10, 15, 35);
+    
+    // Create a gradient overlay (not animated, just for visual depth)
+    for (let y = 0; y < height; y += 10) {
         let inter = map(y, 0, height, 0, 1);
-        // Interpolate color: blend the top color with the bottom color based on y position
-        let c = lerpColor(color(5, 8, 25), color(15, 20, 40), inter);
-        // Draw a horizontal line with the blended color
+        let c = lerpColor(color(5, 8, 25, 50), color(15, 20, 40, 50), inter);
         stroke(c);
+        strokeWeight(10);
         line(0, y, width, y);
     }
-    noStroke(); // Stop drawing strokes after gradient is complete
-
-    // Animated scanlines - horizontal lines that flicker like old TV static
-    // Opacity varies based on frameCount so they pulse/flicker
-    stroke(0, 255, 100, 3 + 2 * sin(frameCount * 0.02)); // Reduced opacity: was 15+15, now 3+2
-    for (let y = 0; y < height; y += 8) { // Increased spacing: was 4, now 8
-        line(0, y, width, y); // Draw horizontal scanline
-    }
     noStroke();
-    strokeWeight(1); // Reset stroke weight to default
+    strokeWeight(1);
 
-    // Subtle grid overlay - vertical and horizontal lines for cyber feel
-    stroke(0, 150, 100, 2); // Reduced opacity: was 8, now 2
-    strokeWeight(0.5); // Very thin lines
+    // Static subtle grid overlay (NO ANIMATION - drawn once per frame with fixed opacity)
+    stroke(0, 150, 100, 1); // Very faint green
+    strokeWeight(0.3);
     // Vertical lines
-    for (let x = 0; x < width; x += 120) { // Increased spacing: was 80, now 120
+    for (let x = 0; x < width; x += 150) {
         line(x, 0, x, height);
     }
     // Horizontal lines
-    for (let y = 0; y < height; y += 120) { // Increased spacing: was 80, now 120
+    for (let y = 0; y < height; y += 150) {
         line(0, y, width, y);
     }
     noStroke();
-    strokeWeight(1); // Reset stroke weight to default
+    strokeWeight(1);
 
     // Always draw the game title at the top of every screen
     drawCanvasTitle();
